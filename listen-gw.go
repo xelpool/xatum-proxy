@@ -151,6 +151,9 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		scratchpad := xelishash.ScratchPad{}
 		pow := blob.PowHash(&scratchpad)
 
+		// send dummy "accepted" reply
+		c.WriteMessage(websocket.TextMessage, []byte(`"block_accepted"`))
+
 		// send share to pool
 		sharesToPool <- xatum.C2S_Submit{
 			Data: minerBlob,

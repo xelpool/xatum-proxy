@@ -107,9 +107,10 @@ func clientHandler() {
 
 		log.Debug("sent handshake")
 
-		go cl.Connect()
 		go recvShares(cl)
-		readjobs(cl.Jobs)
+		go readjobs(cl.Jobs)
+
+		cl.Connect()
 
 		time.Sleep(time.Second)
 	}

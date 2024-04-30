@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"os"
 	"runtime"
@@ -15,7 +16,7 @@ import (
 	"xatum-proxy/xelisutil"
 )
 
-const VERSION = "0.1.0"
+const VERSION = "0.1.1"
 
 // Job is a fast & efficient struct used for storing a job in memory
 type Job struct {
@@ -29,6 +30,20 @@ var cl *client.Client
 var sharesToPool = make(chan xatum.C2S_Submit, 1)
 
 func main() {
+	walletAddr := ""
+	debug := false
+	flag.StringVar(&walletAddr, "wallet", "", "your xelis address")
+	flag.BoolVar(&debug, "debug", false, "true if you want to make logs verbose")
+	flag.Parse()
+
+	if debug {
+		Cfg.Debug = true
+	}
+
+	if walletAddr != "" {
+		Cfg.WalletAddress = walletAddr
+	}
+
 	if Cfg.WalletAddress == "YOUR WALLET ADDRESS HERE" {
 		Cfg.WalletAddress = StringPrompt("Enter your wallet address:")
 

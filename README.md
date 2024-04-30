@@ -1,4 +1,4 @@
-# XATUM-PROXY v0.1.0
+# XATUM-PROXY v0.1.1
 An open-source, high-performance Xatum mining proxy.
 Designed to split the work between multiple miners and to offer a bridge between Xatum and Getwork.
 
@@ -14,3 +14,7 @@ Example XATUM-PROXY mining with 3DP-The-AllFather/xelis-gpu-miner
 ```
 ./xelis-taxminer --wallet YOUR_WALLET_ADDRESS --host 127.0.0.1:5210 --boost
 ```
+
+## Command-line flags
+- `--wallet <WALLET ADDRESS>`: Starts XATUM-PROXY with the given wallet address
+- `--debug`: Starts in debug mode

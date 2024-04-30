@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 	"xatum-proxy/log"
 	"xatum-proxy/xatum"
 	"xatum-proxy/xelishash"
@@ -87,17 +88,23 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer c.Close()
 
+	log.Info("Miner with IP", c.RemoteAddr().String(), "connected to Getwork")
+
 	socketsMut.Lock()
 	sockets = append(sockets, c)
 	socketsMut.Unlock()
 
-	// send first job
+	// send job
 	mutCurJob.Lock()
 	if curJob.Diff == 0 {
 		log.Debug("not sending first job, because there is no first job yet")
 		mutCurJob.Unlock()
 		return
 	}
+
+	time.Sleep(2 * time.Second)
+	log.Debug("sending first job")
+
 	diff := strconv.FormatUint(curJob.Diff, 10)
 	blob := curJob.Blob
 	mutCurJob.Unlock()
@@ -108,7 +115,9 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 			Template:   hex.EncodeToString(blob[:]),
 		},
 	})
-	// done sending first job
+	// done sending job
+
+	log.Debug("done sending first job")
 
 	for {
 		mt, message, err := c.ReadMessage()
@@ -128,8 +137,12 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if msgJson["miner_work"] == nil {
-			log.Debug("miner_work is nil")
-			continue
+			if msgJson["block_template"] == nil {
+				log.Debug("miner_work and block_template are nil")
+				continue
+			} else {
+				msgJson["miner_work"] = msgJson["block_template"]
+			}
 		}
 
 		minerWork := msgJson["miner_work"].(string)

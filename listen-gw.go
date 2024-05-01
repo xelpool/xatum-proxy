@@ -35,36 +35,67 @@ var sockets []*websocket.Conn
 func sendJobToWebsocket(diff uint64, blob []byte) {
 	log.Dev("sendJobToWebsocket: num sockets:", len(sockets))
 
+	if len(sockets) > 0 {
+		log.Info("Sending job to", len(sockets), "GetWork miners")
+	}
+
 	socketsMut.Lock()
 	defer socketsMut.Unlock()
 
 	log.Dev("sendJobToWebsocket: socketsMut Lock success")
 
-	sockets2 := make([]*websocket.Conn, 0, len(sockets))
+	// remove disconnected sockets
 
+	sockets2 := make([]*websocket.Conn, 0, len(sockets))
 	for _, c := range sockets {
 		if c == nil {
 			continue
 		}
+		sockets2 = append(sockets2, c)
+	}
+	log.Dev("sendJobToWebsocket: going from", len(sockets), "to", len(sockets2), "getwork miners")
+	sockets = sockets2
 
-		log.Debug("sendJobToWebsocket: sending to IP", c.RemoteAddr().String())
+	// send jobs to the remaining sockets
 
-		err := c.WriteJSON(map[string]any{
-			"new_job": BlockTemplate{
-				Difficulty: strconv.FormatUint(diff, 10),
-				TopoHeight: 0,
-				Template:   hex.EncodeToString(blob),
-			},
-		})
-		if err != nil {
-			log.Warn(err)
+	for ix, cx := range sockets {
+		if cx == nil {
+			log.Dev("cx is nil")
 			continue
 		}
 
-		sockets2 = append(sockets2, c)
-	}
-	sockets = sockets2
+		i := ix
+		c := cx
 
+		// send job in a new thread to avoid blocking the main thread and reduce latency
+		go func() {
+			log.Debug("sendJobToWebsocket: sending to IP", c.RemoteAddr().String())
+
+			err := c.WriteJSON(map[string]any{
+				"new_job": BlockTemplate{
+					Difficulty: strconv.FormatUint(diff, 10),
+					TopoHeight: 0,
+					Template:   hex.EncodeToString(blob),
+				},
+			})
+
+			// if write failed, close the connection (if it isn't already closed) and remove it from
+			// the list of sockets
+			if err != nil {
+				log.Warn("sendJobToWebsocket: cannot send job:", err)
+				c.Close()
+
+				socketsMut.Lock()
+				sockets[i] = nil
+				socketsMut.Unlock()
+
+				log.Warn("sendJobToWebsocket: cannot send job DONE")
+				return
+			}
+
+			log.Debug("sendJobToWebsocket: done, sent to IP", c.RemoteAddr().String())
+		}()
+	}
 }
 
 func listenGetwork() {

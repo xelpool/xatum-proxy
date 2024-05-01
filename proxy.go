@@ -16,7 +16,7 @@ import (
 	"xatum-proxy/xelisutil"
 )
 
-const VERSION = "0.1.1"
+const VERSION = "0.1.2"
 
 // Job is a fast & efficient struct used for storing a job in memory
 type Job struct {
@@ -83,6 +83,8 @@ func StringPrompt(label string) string {
 
 func clientHandler() {
 	for {
+		log.Debug("Starting new connection to the pool")
+
 		var err error
 		cl, err = client.NewClient(Cfg.PoolAddress)
 		if err != nil {
@@ -120,6 +122,7 @@ var curJob Job
 var mutCurJob sync.RWMutex
 
 func recvShares(cl *client.Client) {
+	log.Debug("recvShares started")
 	for {
 		share, ok := <-sharesToPool
 		if !ok {
@@ -129,9 +132,14 @@ func recvShares(cl *client.Client) {
 
 		log.Info("share found, submitting to the pool")
 
+		if !cl.Alive {
+			log.Err("client is not alive")
+			return
+		}
+
 		err := cl.Submit(share)
 		if err != nil {
-			log.Warn(err)
+			log.Err("failed to submit share to pool:", err)
 			return
 		}
 	}

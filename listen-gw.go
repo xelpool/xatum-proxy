@@ -33,8 +33,12 @@ var sockets []*websocket.Conn
 
 // sends a job to all the websockets, and removes old websockets
 func sendJobToWebsocket(diff uint64, blob []byte) {
+	log.Dev("sendJobToWebsocket: num sockets:", len(sockets))
+
 	socketsMut.Lock()
 	defer socketsMut.Unlock()
+
+	log.Dev("sendJobToWebsocket: socketsMut Lock success")
 
 	sockets2 := make([]*websocket.Conn, 0, len(sockets))
 
@@ -42,6 +46,8 @@ func sendJobToWebsocket(diff uint64, blob []byte) {
 		if c == nil {
 			continue
 		}
+
+		log.Debug("sendJobToWebsocket: sending to IP", c.RemoteAddr().String())
 
 		err := c.WriteJSON(map[string]any{
 			"new_job": BlockTemplate{
@@ -94,7 +100,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	sockets = append(sockets, c)
 	socketsMut.Unlock()
 
-	// send job
+	// send first job
 	mutCurJob.Lock()
 	if curJob.Diff == 0 {
 		log.Debug("not sending first job, because there is no first job yet")
@@ -108,14 +114,18 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	diff := strconv.FormatUint(curJob.Diff, 10)
 	blob := curJob.Blob
 	mutCurJob.Unlock()
-	c.WriteJSON(map[string]any{
+
+	err = c.WriteJSON(map[string]any{
 		"new_job": BlockTemplate{
 			Difficulty: diff,
 			TopoHeight: 0,
 			Template:   hex.EncodeToString(blob[:]),
 		},
 	})
-	// done sending job
+	if err != nil {
+		log.Warn("failed to send first job:", err)
+	}
+	// done sending first job
 
 	log.Debug("done sending first job")
 
@@ -165,18 +175,15 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		pow := blob.PowHash(&scratchpad)
 
 		// send dummy "accepted" reply
-		c.WriteMessage(websocket.TextMessage, []byte(`"block_accepted"`))
+		err = c.WriteMessage(websocket.TextMessage, []byte(`"block_accepted"`))
+		if err != nil {
+			log.Err("failed to send dummy accept reply:", err)
+		}
 
 		// send share to pool
 		sharesToPool <- xatum.C2S_Submit{
 			Data: minerBlob,
 			Hash: hex.EncodeToString(pow[:]),
 		}
-
-		/*err = c.WriteMessage(mt, message)
-		if err != nil {
-			log.Info("write:", err)
-			break
-		}*/
 	}
 }

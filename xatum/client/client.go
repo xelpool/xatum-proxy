@@ -15,6 +15,8 @@ type Client struct {
 	PoolAddress string
 	conn        net.Conn
 
+	Alive bool
+
 	Jobs    chan xatum.S2C_Job
 	Prints  chan xatum.S2C_Print
 	Success chan xatum.S2C_Success
@@ -40,17 +42,20 @@ func NewClient(poolAddr string) (*Client, error) {
 		return nil, err
 	}
 
+	cl.Alive = true
+
 	return cl, nil
 }
 
+// Client must NOT be locked before calling this
 func (cl *Client) Connect() {
 	rdr := bufio.NewReader(cl.conn)
 	for {
 		str, err := rdr.ReadString('\n')
 
 		if err != nil {
-			cl.conn.Close()
 			log.Warnf("connection closed: %s", err)
+			cl.Close()
 			return
 		}
 		log.Net("<<<", str)
@@ -69,7 +74,7 @@ func (cl *Client) Connect() {
 			err := json.Unmarshal([]byte(spl[1]), &pData)
 			if err != nil {
 				log.Warn("failed to parse data")
-				cl.conn.Close()
+				cl.Close()
 				return
 			}
 
@@ -83,7 +88,7 @@ func (cl *Client) Connect() {
 			err := json.Unmarshal([]byte(spl[1]), &pData)
 			if err != nil {
 				log.Warn("failed to parse data")
-				cl.conn.Close()
+				cl.Close()
 				return
 			}
 
@@ -106,6 +111,18 @@ func (cl *Client) Connect() {
 
 	}
 
+}
+
+// Client MUST be locked before calling this
+func (cl *Client) Close() {
+	err := cl.conn.Close()
+	if err != nil {
+		log.Debug("cl.conn.Close failed:", err)
+	}
+	close(cl.Jobs)
+	close(cl.Prints)
+	close(cl.Success)
+	cl.Alive = false
 }
 
 // Client MUST be locked before calling this

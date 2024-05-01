@@ -28,16 +28,31 @@ func fmtMessageType(mt int) string {
 	}
 }
 
+type GetworkConn struct {
+	conn *websocket.Conn
+
+	sync.RWMutex
+}
+
+// GetworkConn MUST be locked before calling this
+func (g *GetworkConn) WriteJSON(data interface{}) error {
+	return g.conn.WriteJSON(data)
+}
+
+func (g *GetworkConn) IP() string {
+	return g.conn.RemoteAddr().String()
+}
+
+func (g *GetworkConn) Close() error {
+	return g.conn.Close()
+}
+
 var socketsMut sync.RWMutex
-var sockets []*websocket.Conn
+var sockets []*GetworkConn
 
 // sends a job to all the websockets, and removes old websockets
 func sendJobToWebsocket(diff uint64, blob []byte) {
 	log.Dev("sendJobToWebsocket: num sockets:", len(sockets))
-
-	if len(sockets) > 0 {
-		log.Info("Sending job to", len(sockets), "GetWork miners")
-	}
 
 	socketsMut.Lock()
 	defer socketsMut.Unlock()
@@ -46,7 +61,7 @@ func sendJobToWebsocket(diff uint64, blob []byte) {
 
 	// remove disconnected sockets
 
-	sockets2 := make([]*websocket.Conn, 0, len(sockets))
+	sockets2 := make([]*GetworkConn, 0, len(sockets))
 	for _, c := range sockets {
 		if c == nil {
 			continue
@@ -55,6 +70,10 @@ func sendJobToWebsocket(diff uint64, blob []byte) {
 	}
 	log.Dev("sendJobToWebsocket: going from", len(sockets), "to", len(sockets2), "getwork miners")
 	sockets = sockets2
+
+	if len(sockets) > 0 {
+		log.Info("Sending job to", len(sockets), "GetWork miners")
+	}
 
 	// send jobs to the remaining sockets
 
@@ -69,8 +88,9 @@ func sendJobToWebsocket(diff uint64, blob []byte) {
 
 		// send job in a new thread to avoid blocking the main thread and reduce latency
 		go func() {
-			log.Debug("sendJobToWebsocket: sending to IP", c.RemoteAddr().String())
+			log.Debug("sendJobToWebsocket: sending to IP", c.IP())
 
+			c.Lock()
 			err := c.WriteJSON(map[string]any{
 				"new_job": BlockTemplate{
 					Difficulty: strconv.FormatUint(diff, 10),
@@ -78,12 +98,15 @@ func sendJobToWebsocket(diff uint64, blob []byte) {
 					Template:   hex.EncodeToString(blob),
 				},
 			})
+			c.Unlock()
 
 			// if write failed, close the connection (if it isn't already closed) and remove it from
 			// the list of sockets
 			if err != nil {
 				log.Warn("sendJobToWebsocket: cannot send job:", err)
+				c.Lock()
 				c.Close()
+				c.Unlock()
 
 				socketsMut.Lock()
 				sockets[i] = nil
@@ -93,7 +116,9 @@ func sendJobToWebsocket(diff uint64, blob []byte) {
 				return
 			}
 
-			log.Debug("sendJobToWebsocket: done, sent to IP", c.RemoteAddr().String())
+			c.RLock()
+			log.Debug("sendJobToWebsocket: done, sent to IP", c.IP())
+			c.RUnlock()
 		}()
 	}
 }
@@ -128,7 +153,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	log.Info("Miner with IP", c.RemoteAddr().String(), "connected to Getwork")
 
 	socketsMut.Lock()
-	sockets = append(sockets, c)
+	sockets = append(sockets, &GetworkConn{conn: c})
 	socketsMut.Unlock()
 
 	// send first job

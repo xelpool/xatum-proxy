@@ -143,17 +143,18 @@ type BlockTemplate struct {
 }
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
-	c, err := upgrader.Upgrade(w, r, nil)
+	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Warn("upgrade:", err)
 		return
 	}
-	defer c.Close()
+	defer conn.Close()
 
-	log.Info("Miner with IP", c.RemoteAddr().String(), "connected to Getwork")
+	log.Info("Miner with IP", conn.RemoteAddr().String(), "connected to Getwork")
 
 	socketsMut.Lock()
-	sockets = append(sockets, &GetworkConn{conn: c})
+	c := &GetworkConn{conn: conn}
+	sockets = append(sockets, c)
 	socketsMut.Unlock()
 
 	// send first job
@@ -171,6 +172,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	blob := curJob.Blob
 	mutCurJob.Unlock()
 
+	c.Lock()
 	err = c.WriteJSON(map[string]any{
 		"new_job": BlockTemplate{
 			Difficulty: diff,
@@ -178,6 +180,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 			Template:   hex.EncodeToString(blob[:]),
 		},
 	})
+	c.Unlock()
 	if err != nil {
 		log.Warn("failed to send first job:", err)
 	}
@@ -186,7 +189,9 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug("done sending first job")
 
 	for {
-		mt, message, err := c.ReadMessage()
+		c.Lock()
+		mt, message, err := c.conn.ReadMessage()
+		c.Unlock()
 		if err != nil {
 			log.Info("Getwork miner disconnected:", err)
 			break
@@ -231,7 +236,9 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		pow := blob.PowHash(&scratchpad)
 
 		// send dummy "accepted" reply
-		err = c.WriteMessage(websocket.TextMessage, []byte(`"block_accepted"`))
+		c.Lock()
+		err = c.conn.WriteMessage(websocket.TextMessage, []byte(`"block_accepted"`))
+		c.Unlock()
 		if err != nil {
 			log.Err("failed to send dummy accept reply:", err)
 		}

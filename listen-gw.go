@@ -189,9 +189,7 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 	log.Debug("done sending first job")
 
 	for {
-		c.RLock()
 		mt, message, err := c.conn.ReadMessage()
-		c.RUnlock()
 		if err != nil {
 			log.Info("Getwork miner disconnected:", err)
 			break

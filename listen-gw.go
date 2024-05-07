@@ -99,6 +99,8 @@ func sendJobToWebsocket(diff uint64, blob []byte) {
 			})
 			c.Unlock()
 
+			log.Debug("sendJobToWebsocket: sent to IP", c.IP())
+
 			// if write failed, close the connection (if it isn't already closed) and remove it from
 			// the list of sockets
 			if err != nil {

@@ -27,7 +27,7 @@ type Job struct {
 
 var cl *client.Client
 
-var sharesToPool = make(chan xatum.C2S_Submit, 1)
+var sharesToPool chan xatum.C2S_Submit
 
 func main() {
 	walletAddr := ""
@@ -85,6 +85,8 @@ func clientHandler() {
 	for {
 		log.Info("Starting a new connection to the pool")
 
+		sharesToPool = make(chan xatum.C2S_Submit, 1)
+
 		var err error
 		cl, err = client.NewClient(Cfg.PoolAddress)
 		if err != nil {
@@ -113,6 +115,8 @@ func clientHandler() {
 		go readjobs(cl.Jobs)
 
 		cl.Connect()
+
+		close(sharesToPool)
 
 		log.Debug("pool connection closed, starting a new one")
 

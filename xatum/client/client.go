@@ -18,6 +18,8 @@ type Client struct {
 
 	Alive bool
 
+	LastJob time.Time
+
 	Jobs    chan xatum.S2C_Job
 	Prints  chan xatum.S2C_Print
 	Success chan xatum.S2C_Success
@@ -52,7 +54,7 @@ func NewClient(poolAddr string) (*Client, error) {
 func (cl *Client) Connect() {
 	rdr := bufio.NewReader(cl.conn)
 	for {
-		cl.conn.SetReadDeadline(time.Now().Add(2 * time.Minute))
+		cl.conn.SetReadDeadline(time.Now().Add(time.Minute))
 
 		str, err := rdr.ReadString('\n')
 
@@ -71,6 +73,16 @@ func (cl *Client) Connect() {
 
 		pack := spl[0]
 
+		cl.Lock()
+		if pack != xatum.PacketS2C_Job && time.Since(cl.LastJob) > time.Minute {
+			log.Err("no jobs received in the last minute, reconnecting")
+
+			cl.Close()
+			cl.Unlock()
+			return
+		}
+		cl.Unlock()
+
 		if pack == xatum.PacketS2C_Job {
 			pData := xatum.S2C_Job{}
 
@@ -84,6 +96,9 @@ func (cl *Client) Connect() {
 			log.Debug("ok, job received, sending to channel")
 
 			cl.Jobs <- pData
+			cl.Lock()
+			cl.LastJob = time.Now()
+			cl.Unlock()
 
 			log.Debug("ok, done sending to channel")
 		} else if pack == xatum.PacketS2C_Print {

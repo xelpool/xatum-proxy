@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strconv"
 	"sync"
-	"time"
 	"xatum-proxy/log"
 	"xatum-proxy/xatum"
 	"xatum-proxy/xelishash"
@@ -165,7 +164,6 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	time.Sleep(2 * time.Second)
 	log.Debug("sending first job")
 
 	diff := strconv.FormatUint(curJob.Diff, 10)

@@ -154,17 +154,16 @@ func handleConnPacket(s *server.Server, conn *server.Connection, str string, pac
 		if curJob.Diff == 0 {
 			log.Debug("not sending first job, because there is no first job yet")
 			mutCurJob.Unlock()
-			return nil
+		} else {
+			diff := curJob.Diff
+			blob := curJob.Blob
+
+			log.Debugf("first job diff %d blob %x", diff, blob)
+
+			SendJob(conn, diff, blob[:])
+
+			mutCurJob.Unlock()
 		}
-
-		diff := curJob.Diff
-		blob := curJob.Blob
-
-		mutCurJob.Unlock()
-
-		log.Debugf("first job diff %d blob %x", diff, blob)
-
-		SendJob(conn, diff, blob[:])
 	} else if pack == xatum.PacketC2S_Pong {
 		log.Dev("received pong packet")
 	} else if pack == xatum.PacketC2S_Submit {

@@ -16,7 +16,7 @@ import (
 	"xatum-proxy/xelisutil"
 )
 
-const VERSION = "0.1.4"
+const VERSION = "0.1.5"
 
 // Job is a fast & efficient struct used for storing a job in memory
 type Job struct {

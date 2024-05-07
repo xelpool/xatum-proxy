@@ -7,6 +7,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
 	"xatum-proxy/log"
 	"xatum-proxy/xatum"
 )
@@ -51,6 +52,8 @@ func NewClient(poolAddr string) (*Client, error) {
 func (cl *Client) Connect() {
 	rdr := bufio.NewReader(cl.conn)
 	for {
+		cl.conn.SetReadDeadline(time.Now().Add(2 * time.Minute))
+
 		str, err := rdr.ReadString('\n')
 
 		if err != nil {

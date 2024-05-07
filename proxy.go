@@ -83,7 +83,7 @@ func StringPrompt(label string) string {
 
 func clientHandler() {
 	for {
-		log.Debug("Starting new connection to the pool")
+		log.Info("Starting a new connection to the pool")
 
 		var err error
 		cl, err = client.NewClient(Cfg.PoolAddress)
@@ -113,6 +113,8 @@ func clientHandler() {
 		go readjobs(cl.Jobs)
 
 		cl.Connect()
+
+		log.Debug("pool connection closed, starting a new one")
 
 		time.Sleep(time.Second)
 	}

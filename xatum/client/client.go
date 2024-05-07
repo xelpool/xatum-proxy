@@ -31,6 +31,9 @@ func NewClient(poolAddr string) (*Client, error) {
 	cl := &Client{
 		PoolAddress: poolAddr,
 
+		Alive:   true,
+		LastJob: time.Now(),
+
 		Jobs:    make(chan xatum.S2C_Job, 1),
 		Prints:  make(chan xatum.S2C_Print, 1),
 		Success: make(chan xatum.S2C_Success, 1),
@@ -44,8 +47,6 @@ func NewClient(poolAddr string) (*Client, error) {
 		log.Warnf("connection failed: %s", err)
 		return nil, err
 	}
-
-	cl.Alive = true
 
 	return cl, nil
 }
@@ -74,7 +75,7 @@ func (cl *Client) Connect() {
 		pack := spl[0]
 
 		cl.Lock()
-		if pack != xatum.PacketS2C_Job && time.Since(cl.LastJob) > time.Minute {
+		if pack != xatum.PacketS2C_Job && time.Since(cl.LastJob) > 10*time.Minute {
 			log.Err("no jobs received in the last minute, reconnecting")
 
 			cl.Close()

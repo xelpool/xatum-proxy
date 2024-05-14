@@ -1,3 +1,7 @@
+# OUTDATED
+Updated version: [https://github.com/xelpool/xelis-proxy](XELIS-PROXY)
+
+
 # XATUM-PROXY v0.1.1
 An open-source, high-performance Xatum mining proxy.
 Designed to split the work between multiple miners and to offer a bridge between Xatum and Getwork.

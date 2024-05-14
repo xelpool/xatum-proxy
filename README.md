@@ -1,5 +1,5 @@
 # OUTDATED
-Updated version: [https://github.com/xelpool/xelis-proxy](XELIS-PROXY)
+Updated version: https://github.com/xelpool/xelis-proxy
 
 
 # XATUM-PROXY v0.1.1
